@@ -1,0 +1,17 @@
+SELECT
+    d.name AS db_name,
+    i.instance_name AS server_name,
+    CASE
+        WHEN i.parallel = 'YES' THEN 'RAC'
+        ELSE 'Standalone'
+    END AS rac_status,
+    CASE
+        WHEN p.value IS NOT NULL THEN 'Running with SPFILE: ' || p.value
+        ELSE 'Running with PFILE'
+    END AS spfile_pfile_status
+FROM
+    v$database d,
+    v$instance i,
+    v$parameter p
+WHERE
+    p.name = 'spfile';
