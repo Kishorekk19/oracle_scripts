@@ -1,0 +1,30 @@
+#!/bin/bash
+ 
+SERVER_LIST=server_list.txt
+OUTPUT=oratab_N_report.csv
+ 
+echo "SERVER_NAME,DB_NAME,ORACLE_HOME,AUTO_START,STATUS" > $OUTPUT
+ 
+for SERVER in $(cat $SERVER_LIST)
+do
+ 
+ssh -o BatchMode=yes -o ConnectTimeout=5 $SERVER "hostname" >/dev/null 2>&1
+ 
+if [ $? -ne 0 ]
+then
+    echo "$SERVER,SSH_CONNECTION_FAILED,,,ERROR" >> $OUTPUT
+    continue
+fi
+ 
+ssh -o BatchMode=yes $SERVER '
+HOST=$(hostname)
+ 
+grep -v "^#" /etc/oratab | grep ":N" | while IFS=: read DB HOME AUTO
+do
+echo "$HOST,$DB,$HOME,$AUTO,SUCCESS"
+done
+' >> $OUTPUT
+ 
+done
+ 
+echo "Report generated: $OUTPUT"
