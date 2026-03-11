@@ -1,0 +1,76 @@
+#!/bin/bash
+ 
+SERVER_LIST=server_list.txt
+OUTPUT=db_inventory_final.csv
+ 
+echo "SERVER,DB_NAME,DB_TYPE,FILE_TYPE" > $OUTPUT
+ 
+for SERVER in $(cat $SERVER_LIST)
+do
+ 
+ssh -o BatchMode=yes -o ConnectTimeout=5 $SERVER '
+ 
+HOST=$(hostname)
+ 
+if [ -f /etc/oratab ]; then
+   ORATAB=/etc/oratab
+elif [ -f /var/opt/oracle/oratab ]; then
+   ORATAB=/var/opt/oracle/oratab
+else
+   exit
+fi
+ 
+grep -v "^#" $ORATAB | grep -v "^+ASM" | while IFS=: read DB HOME AUTO
+do
+ 
+[ -z "$DB" ] && continue
+ 
+export ORACLE_SID=$DB
+export ORACLE_HOME=$HOME
+export PATH=$ORACLE_HOME/bin:$PATH
+ 
+ps -ef | grep pmon_$DB | grep -v grep >/dev/null
+ 
+if [ $? -eq 0 ]
+then
+ 
+SPFILE=$($ORACLE_HOME/bin/sqlplus -s / as sysdba <<EOF
+set pages 0 feedback off heading off
+show parameter spfile;
+exit;
+EOF
+)
+ 
+if echo "$SPFILE" | grep -q "/";
+then
+FILETYPE=SPFILE
+else
+FILETYPE=PFILE
+fi
+ 
+ 
+CLUSTER=$($ORACLE_HOME/bin/sqlplus -s / as sysdba <<EOF
+set pages 0 feedback off heading off
+show parameter cluster_database;
+exit;
+EOF
+)
+ 
+if echo "$CLUSTER" | grep -q TRUE
+then
+DBTYPE=RAC
+else
+DBTYPE=STANDALONE
+fi
+ 
+echo "$HOST,$DB,$DBTYPE,$FILETYPE"
+ 
+fi
+ 
+done
+ 
+' >> $OUTPUT
+ 
+done
+ 
+echo "Report generated: $OUTPUT"
